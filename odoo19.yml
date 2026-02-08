@@ -1,0 +1,133 @@
+#Author - Anshit Verma
+#Date - 31-01-2026
+#Description - Install ODOO 19 with dependencies
+---
+  - name: Install ODOO 19
+    hosts: vagrant
+    become: yes
+    vars:
+      user_name: vagrant
+      group: vagrant
+      db_user: odoo
+
+    tasks:
+      - name: Update Packages
+        apt:
+          update_cache: yes
+
+      - name: Install required packages
+        apt:
+          name: software-properties-common
+          state: present
+
+      - name: Add Deadsnakes PPA
+        apt_repository:
+          repo: ppa:deadsnakes/ppa
+          state: present
+
+      - name: Update apt cache after adding PPA
+        apt:
+          update_cache: yes
+
+      - name: Install Python 3.11 and related packages
+        apt:
+          name:
+            - python3.11
+            - python3.11-venv
+            - python3.11-dev
+            - python3-psycopg2
+          state: present
+
+      - name: Register Python 3.11 alternative
+        command: >
+          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 20
+
+      - name: Set Python 3.11 as default python
+        command: >
+          update-alternatives --set python /usr/bin/python3.11
+
+      - name: Get Python Version
+        command: python --version
+        register: python_version
+
+      - name: Show Python Version Enabled
+        debug:
+           msg: "Python Version: {{ python_version.stdout }}"
+
+      - name: Install required packages
+        apt:
+         name:
+          - git
+          - python3
+          - python3-pip
+          - python3-dev
+          - build-essential
+          - wget
+          - libxslt-dev
+          - libzip-dev
+          - libldap2-dev
+          - libsasl2-dev
+          - libjpeg-dev
+          - libpq-dev
+          - libffi-dev
+          - libssl-dev
+          - nodejs
+          - npm
+          - postgresql
+          - postgresql-contrib
+         state: present
+         update_cache: yes
+
+      - name: Install rtlcss globally
+        npm:
+          name: rtlcss
+          global: yes
+
+      - name: Start PostgreSQL Service
+        systemd:
+            name: postgresql
+            state: started
+            enabled: yes
+
+#      - name: Create user {{ db_user }}
+#        command: "sudo -u postgres createuser -s {{ db_user }}"
+
+      - name: Create opt etc var
+        command: " mkdir -p /home/{{ user_name }}/opt /home/{{ user_name }}/etc /home/{{ user_name }}/var"
+
+      - name: Change ownership of opt etc var
+        command: "chown -R {{ user_name }}:{{ group }} /home{{ user_name }}/opt /home/{{ user_name }}/etc /home/{{ user_name }}/var"
+
+      - name: Ensure git is installed
+        apt:
+          name: git
+          state: present
+          update_cache: yes
+
+      - name: Clone Odoo 19 repository
+        git:
+          repo: "https://www.github.com/odoo/odoo"
+          version: "19.0"
+          dest: /home/{{ user_name }}/opt
+          depth: 1
+          update: no
+
+      - name: Copy odoo19.conf
+        copy:
+          src: odoo19.conf
+          dest: /home/{{ user_name }}/etc
+
+      - name: Change ownership of odoo19.conf
+        command: chown {{ user_name }}:{{ group }} /home/{{ user_name }}/etc/odoo19.conf
+
+      - name: Upgrade pip
+        command: python3 -m pip install --upgrade pip
+
+      - name: Instal wheel
+        command: python3 -m pip install wheel
+
+      - name: Install odoo19 requirements.txt
+        command: python3 -m pip install /home/{{ user_name }}/opt/odoo/odoo19/requirements.txt
+
+
+...

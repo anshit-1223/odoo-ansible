@@ -1,0 +1,52 @@
+- name: Setup PostgreSQL for Odoo 19
+  hosts: webservers
+  become: yes
+  vars:
+    system_user: vagrant
+    db_user: odoo
+    db_name: odoo19
+    db_password: "odoo123"
+
+  tasks:
+
+    - name: Ensure PostgreSQL is installed
+      apt:
+        name: postgresql
+        state: present
+        update_cache: yes
+
+    - name: Ensure PostgreSQL service is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Check User Exists!
+      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}';"
+      register: user_check
+
+
+    - name: Create PostgreSQL superuser for Odoo
+      command: sudo -u postgres createuser -s {{ db_user }}
+      when: user_check.stdout | trim != "1"
+
+    - name: Check {{ db_name }} exists
+      shell: sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}';"
+      register: db_check
+
+    - name: Create PostgreSQL database for Odoo
+      command: sudo -u postgres createdb -O {{ db_user }} {{ db_name }}
+      when: db_check.stdout | trim != "1"
+
+#    - name: Debug info
+#      debug:
+#        msg: "System user {{ system_user }}, PostgreSQL user {{ db_user }}, DB {{ db_name }} ready."
+
+    - name: Debug info
+      debug:
+        msg: >
+          System user {{ system_user }},
+          PostgreSQL user {{ db_user }} {% if user_check.stdout | trim == "1" %}(already exists){% else %}(created){% endif %},
+          DB {{ db_name }} {% if db_check.stdout | trim == "1" %}(already exists){% else %}(created){% endif %}.
+
+...

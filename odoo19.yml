@@ -3,12 +3,13 @@
 #Description - Install ODOO 19 with dependencies
 ---
   - name: Install ODOO 19
-    hosts: vagrant
+    hosts: webservers
     become: yes
     vars:
-      user_name: vagrant
-      group: vagrant
+      user_name: anshit
+      group: anshit
       db_user: odoo
+      project_path: /home/anshit
 
     tasks:
       - name: Update Packages
@@ -36,18 +37,22 @@
             - python3.11-venv
             - python3.11-dev
             - python3-psycopg2
+            - python3-dev
+            - python3-pip
+            - build-essential
+            - python3-lxml
           state: present
 
-      - name: Register Python 3.11 alternative
-        command: >
-          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 20
+#      - name: Register Python 3.11 alternative
+#        command: >
+#          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 20
 
-      - name: Set Python 3.11 as default python
-        command: >
-          update-alternatives --set python /usr/bin/python3.11
+#      - name: Set Python 3.11 as default python
+#        command: >
+#          update-alternatives --set python /usr/bin/python3.11
 
       - name: Get Python Version
-        command: python --version
+        command: python3 --version
         register: python_version
 
       - name: Show Python Version Enabled
@@ -89,14 +94,11 @@
             state: started
             enabled: yes
 
-#      - name: Create user {{ db_user }}
-#        command: "sudo -u postgres createuser -s {{ db_user }}"
-
       - name: Create opt etc var
-        command: " mkdir -p /home/{{ user_name }}/opt /home/{{ user_name }}/etc /home/{{ user_name }}/var"
+        command: " mkdir -p {{ project_path }}/opt {{ project_path }}/etc {{ project_path }}/var"
 
       - name: Change ownership of opt etc var
-        command: "chown -R {{ user_name }}:{{ group }} /home{{ user_name }}/opt /home/{{ user_name }}/etc /home/{{ user_name }}/var"
+        command: "chown -R {{ user_name }}:{{ group }} {{ project_path }}/opt {{ project_path }}/etc {{ project_path }}/var"
 
       - name: Ensure git is installed
         apt:
@@ -106,9 +108,9 @@
 
       - name: Clone Odoo 19 repository
         git:
-          repo: "https://www.github.com/odoo/odoo"
+          repo: "https://www.github.com/odoo/odoo.git"
           version: "19.0"
-          dest: /home/{{ user_name }}/opt
+          dest: /home/{{ user_name }}/opt/odoo19
           depth: 1
           update: no
 
@@ -117,17 +119,55 @@
           src: odoo19.conf
           dest: /home/{{ user_name }}/etc
 
+      - name: change addons path
+        lineinfile:
+          path: "{{ project_path }}/etc/odoo19.conf"
+          regexp: '^addons_path'
+          line: 'addons_path = {{ project_path }}/opt/odoo19'
+          state: present
+
+      - name: change logfile path
+        lineinfile:
+          path: "{{ project_path }}/etc/odoo19.conf"
+          regexp: '^logfile'
+          line: 'logfile = {{ project_path }}/var/odoo19/odoo19.log'
+          state: present
+
       - name: Change ownership of odoo19.conf
-        command: chown {{ user_name }}:{{ group }} /home/{{ user_name }}/etc/odoo19.conf
+        command: chown {{ user_name }}:{{ group }} {{ project_path }}/etc/odoo19.conf
 
-      - name: Upgrade pip
-        command: python3 -m pip install --upgrade pip
+#      - name: Upgrade pip
+#        command: python3 -m pip install --upgrade pip --break-system-packages
 
-      - name: Instal wheel
-        command: python3 -m pip install wheel
+#      - name: Instal wheel
+#        command: python3 -m pip install wheel
+
+      - name: Ensure system Python and dev tools are installed for Odoo 19
+        apt:
+          name:
+            - python3                   # Base Python 3 interpreter
+            - python3-pip               # pip (for optional packages if needed)
+            - python3-dev               # Python headers for compiling modules
+            - build-essential           # GCC, make, etc.
+            - python3-wheel             # Wheel support
+            - python3-psycopg2          # PostgreSQL adapter
+            - python3-lxml              # XML parsing
+            - python3-dateutil          # Date/time utilities
+            - python3-requests          # HTTP client
+            - python3-pillow            # Image processing
+            - python3-passlib           # Password hashing
+            - python3-babel             # Translations / localization
+            - python3-werkzeug          # WSGI server library
+            - python3-cryptography      # Encryption / security
+            - python3-psutil            # Monitoring / performance
+            - python3-markupsafe        # Template rendering
+            - python3-html2text         # Optional: HTML → text conversion
+            - libsasl2-dev          # Optional: LDAP / authentication
+          state: present
+          update_cache: yes
 
       - name: Install odoo19 requirements.txt
-        command: python3 -m pip install /home/{{ user_name }}/opt/odoo/odoo19/requirements.txt
+        command: pip install --break-system-packages -r {{ project_path }}/opt/odoo19/requirements.txt
 
 
 ...
